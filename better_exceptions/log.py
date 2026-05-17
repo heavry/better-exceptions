@@ -7,9 +7,14 @@ from logging import Logger, StreamHandler
 
 def patch():
     import logging
-    from . import format_exception
+    from .formatter import ExceptionFormatter, THEME, MAX_LENGTH, PIPE_CHAR, CAP_CHAR
 
-    logging_format_exception = lambda exc_info: u''.join(format_exception(*exc_info))
+    def logging_format_exception(exc_info):
+        formatter = ExceptionFormatter(
+            colored=False, theme=THEME, max_length=MAX_LENGTH,
+            pipe_char=PIPE_CHAR, cap_char=CAP_CHAR
+        )
+        return u''.join(formatter.format_exception(*exc_info))
 
     if hasattr(logging, '_defaultFormatter'):
         logging._defaultFormatter.format_exception = logging_format_exception
