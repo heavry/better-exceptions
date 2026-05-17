@@ -1,29 +1,36 @@
 from __future__ import absolute_import
 
+import logging
 import sys
 
 from logging import Logger, StreamHandler
 
 
-def patch():
-    import logging
+def _uncolored_format_exception(exc_info):
+    """Format exception without ANSI color codes."""
     from .formatter import ExceptionFormatter, THEME, MAX_LENGTH, PIPE_CHAR, CAP_CHAR
 
-    def logging_format_exception(exc_info):
-        formatter = ExceptionFormatter(
-            colored=False, theme=THEME, max_length=MAX_LENGTH,
-            pipe_char=PIPE_CHAR, cap_char=CAP_CHAR
-        )
-        return u''.join(formatter.format_exception(*exc_info))
+    formatter = ExceptionFormatter(
+        colored=False, theme=THEME, max_length=MAX_LENGTH,
+        pipe_char=PIPE_CHAR, cap_char=CAP_CHAR
+    )
+    return u''.join(formatter.format_exception(*exc_info))
 
-    if hasattr(logging, '_defaultFormatter'):
-        logging._defaultFormatter.format_exception = logging_format_exception
 
-    patchables = [handler() for handler in logging._handlerList if isinstance(handler(), StreamHandler)]
-    patchables = [handler for handler in patchables if handler.stream == sys.stderr]
-    patchables = [handler for handler in patchables if handler.formatter is not None]
-    for handler in patchables:
-        handler.formatter.formatException = logging_format_exception
+def patch():
+    from . import format_exception
+
+    colored_fn = lambda exc_info: u''.join(format_exception(*exc_info))
+
+    for handler_ref in logging._handlerList:
+        handler = handler_ref()
+        if handler is None or handler.formatter is None:
+            continue
+
+        if isinstance(handler, StreamHandler) and handler.stream is sys.stderr:
+            handler.formatter.formatException = colored_fn
+        else:
+            handler.formatter.formatException = _uncolored_format_exception
 
 
 class BetExcLogger(Logger):
